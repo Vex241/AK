@@ -20,7 +20,7 @@ _G.whitelistedPlayers = {"indieuns_fan"}
 _G.autoPunchEnabled = true -- ENABLED BY DEFAULT
 _G.fastPunchEnabled = true -- ENABLED BY DEFAULT
 _G.punchSpamRate = 3
-_G.autoTeleportTinyIsland = true -- NEW: Auto teleport to Tiny Island
+_G.autoTeleportTinyIsland = true -- ENABLED BY DEFAULT
 
 -- JamJam Server Hop Variables
 local AllIDs = {}
@@ -56,11 +56,14 @@ local function getCharacter()
     return char
 end
 
--- NEW: Teleport to Tiny Island
+-- FIXED: Teleport to Tiny Island - simpler and more reliable
 local function teleportToTinyIsland()
     task.spawn(function()
-        local character = getCharacter()
-        local hrp = character:WaitForChild("HumanoidRootPart", 5)
+        wait(0.5) -- Wait for character to fully load
+        local character = LocalPlayer.Character
+        if not character then return end
+        
+        local hrp = character:FindFirstChild("HumanoidRootPart")
         if hrp then
             hrp.CFrame = CFrame.new(-37.1, 9.2, 1919)
             print("✅ Teleported to Tiny Island")
@@ -244,7 +247,7 @@ end
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/ISPPs54/Ui/refs/heads/main/eeee", true))()
 local Window = Library:AddWindow("Miyavi-AK Popular Hop", {
     main_color = Color3.fromRGB(255, 0, 0),
-    min_size = Vector2.new(350, 320), -- Increased height for new toggle
+    min_size = Vector2.new(350, 320),
     can_resize = false
 })
 
@@ -272,7 +275,7 @@ local fastPunchToggle = MainTab:AddSwitch("Fast Punch", function(enabled)
     statusLabel.Text = "✅ Fast Punch: " .. (enabled and "ON" or "OFF")
 end, true)
 
--- NEW: Auto Tiny Island toggle (starts ON)
+-- Auto Tiny Island toggle (starts ON)
 local autoTinyToggle = MainTab:AddSwitch("Auto Tiny Island", function(enabled)
     _G.autoTeleportTinyIsland = enabled
     statusLabel.Text = "✅ Auto Tiny Island: " .. (enabled and "ON" or "OFF")
@@ -308,10 +311,16 @@ MainTab:AddButton("Clear Whitelist", function()
     whitelistLabel.Text = "Whitelisted: indieuns_fan"
 end)
 
--- Initialize
-getCharacter()
-equipPunch()
-statusLabel.Text = "✅ Status: Killing All"
+-- FIXED: Initialize and teleport immediately
+task.spawn(function()
+    wait(1) -- Wait for UI to load
+    getCharacter()
+    equipPunch()
+    if _G.autoTeleportTinyIsland then
+        teleportToTinyIsland()
+    end
+    statusLabel.Text = "✅ Status: Killing All"
+end)
 
 -- Main kill loop
 _G.killConnection = RunService.Heartbeat:Connect(function()
@@ -324,11 +333,11 @@ _G.killConnection = RunService.Heartbeat:Connect(function()
     end
 end)
 
--- Handle character respawn
+-- FIXED: Handle character respawn with proper teleport
 LocalPlayer.CharacterAdded:Connect(function()
-    task.wait(0.5)
+    wait(0.5)
     equipPunch()
-    -- NEW: Auto teleport to Tiny Island on respawn
+    -- Auto teleport to Tiny Island on respawn
     if _G.autoTeleportTinyIsland then
         teleportToTinyIsland()
     end
