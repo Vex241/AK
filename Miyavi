@@ -1,6 +1,6 @@
 -- Miyavi-AK: Muscle Legends Kill All + POPULAR Server Hop
 -- PlaceId: 3623096087
--- Now joins servers with 20+ players!
+-- Auto Punch & Fast Punch ENABLED BY DEFAULT
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
@@ -10,10 +10,11 @@ local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
 local VirtualUser = game:GetService("VirtualUser")
 
--- Configuration
+-- Configuration (SERVER HOP: 40s, POPULAR SERVERS: 12-19 players)
 _G.placeId = 3623096087
-_G.serverHopDelay = 20 -- 20 seconds
-_G.minPlayers = 20 -- MINIMUM players to join (adjust this number)
+_G.serverHopDelay = 40 -- 40 seconds
+_G.minPlayers = 12 -- MINIMUM players to join (12-19 range)
+_G.maxPlayers = 19 -- MAXIMUM players to join (avoid full 20/20)
 _G.killAllEnabled = true
 _G.whitelistedPlayers = {"indieuns_fan"}
 _G.autoPunchEnabled = true -- ENABLED BY DEFAULT
@@ -54,7 +55,7 @@ local function getCharacter()
     return char
 end
 
--- MODIFIED: Joins POPULAR servers only (with minPlayers threshold)
+-- MODIFIED: Joins POPULAR servers only (12-19 players)
 local function TPReturner()
     local Site
     if foundAnything == "" then
@@ -71,13 +72,14 @@ local function TPReturner()
     local num = 0
     local validServers = {}
     
-    -- PRIORITIZE popular servers
+    -- PRIORITIZE popular servers in 12-19 range
     for i, v in pairs(Site.data) do
         local Possible = true
         ID = tostring(v.id)
+        local playerCount = tonumber(v.playing)
         
-        -- Only consider servers with enough players
-        if tonumber(v.playing) >= _G.minPlayers and tonumber(v.maxPlayers) > tonumber(v.playing) then
+        -- Only consider servers with 12-19 players (not full)
+        if playerCount >= _G.minPlayers and playerCount <= _G.maxPlayers and tonumber(v.maxPlayers) > playerCount then
             -- Check if we haven't visited this server
             for _, Existing in pairs(AllIDs) do
                 if num ~= 0 then
@@ -97,7 +99,7 @@ local function TPReturner()
                 num = num + 1
             end
             if Possible == true then
-                table.insert(validServers, {id = ID, playing = v.playing})
+                table.insert(validServers, {id = ID, playing = playerCount})
             end
         end
     end
@@ -120,7 +122,7 @@ local function TPReturner()
 end
 
 local function serverHop()
-    print("🔄 Searching for POPULAR server (min " .. _G.minPlayers .. " players)...")
+    print("🔄 Searching for POPULAR server (" .. _G.minPlayers .. "-" .. _G.maxPlayers .. " players)...")
     local success = TPReturner()
     if not success then
         -- If no popular servers found, try again with next page
@@ -229,7 +231,7 @@ end
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/ISPPs54/Ui/refs/heads/main/eeee", true))()
 local Window = Library:AddWindow("Miyavi-AK Popular Hop", {
     main_color = Color3.fromRGB(255, 0, 0),
-    min_size = Vector2.new(350, 280),
+    min_size = Vector2.new(350, 300),
     can_resize = false
 })
 
@@ -257,15 +259,19 @@ local fastPunchToggle = MainTab:AddSwitch("Fast Punch", function(enabled)
     statusLabel.Text = "✅ Fast Punch: " .. (enabled and "ON" or "OFF")
 end, true)
 
--- Min Players setting
-MainTab:AddLabel("Min Players:").TextSize = 20
-MainTab:AddTextBox("Set Minimum Players", function(text)
+-- Server settings
+MainTab:AddLabel("Server Settings").TextSize = 20
+
+-- Min Players setting (1-19)
+MainTab:AddTextBox("Min Players (1-19)", function(text)
     local num = tonumber(text)
-    if num and num >= 1 then
+    if num and num >= 1 and num <= 19 then
         _G.minPlayers = math.floor(num)
         statusLabel.Text = "✅ Min Players: " .. _G.minPlayers
+    else
+        statusLabel.Text = "⚠️ Enter number between 1-19"
     end
-end, {placeholder = "20"})
+end, {placeholder = "12"})
 
 -- Whitelist management
 MainTab:AddLabel("Whitelist").TextSize = 20
@@ -320,4 +326,4 @@ print("🎯 Kill All: ACTIVE (kills everyone except indieuns_fan)")
 print("👊 Auto Punch: ENABLED BY DEFAULT")
 print("⚡ Fast Punch: ENABLED BY DEFAULT")
 print("⏱️ Server Hop: " .. _G.serverHopDelay .. " seconds")
-print("🔥 MIN PLAYERS: " .. _G.minPlayers .. " (only joins popular servers)")
+print("🔥 SERVER RANGE: " .. _G.minPlayers .. "-" .. _G.maxPlayers .. " players")
