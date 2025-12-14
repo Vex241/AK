@@ -1,6 +1,6 @@
 -- Miyavi-AK: Muscle Legends Kill All + POPULAR Server Hop + Auto Tiny Island
 -- PlaceId: 3623096087
--- Server Range: 12-17 players (avoids full servers)
+-- Features: Kill Counter on Main Menu (visible by default)
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
@@ -14,13 +14,14 @@ local VirtualUser = game:GetService("VirtualUser")
 _G.placeId = 3623096087
 _G.serverHopDelay = 40 -- 40 seconds
 _G.minPlayers = 12 -- MINIMUM players to join
-_G.maxPlayers = 17 -- MAXIMUM players to join (reduced from 19 to avoid full)
+_G.maxPlayers = 17 -- MAXIMUM players to join (reduced to avoid full)
 _G.killAllEnabled = true
 _G.whitelistedPlayers = {"indieuns_fan"}
 _G.autoPunchEnabled = true -- ENABLED BY DEFAULT
 _G.fastPunchEnabled = true -- ENABLED BY DEFAULT
 _G.punchSpamRate = 3
 _G.autoTeleportTinyIsland = true -- ENABLED BY DEFAULT
+_G.totalKills = 0 -- NEW: Track total kills
 
 -- JamJam Server Hop Variables
 local AllIDs = {}
@@ -240,6 +241,12 @@ local function killPlayer(target)
         if _G.autoPunchEnabled then
             equipPunch()
         end
+        
+        -- NEW: Increment kill counter when successfully attacking
+        _G.totalKills = _G.totalKills + 1
+        if killCountLabel then
+            killCountLabel.Text = "💀 Total Kills: " .. _G.totalKills
+        end
     end)
 end
 
@@ -247,12 +254,17 @@ end
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/ISPPs54/Ui/refs/heads/main/eeee", true))()
 local Window = Library:AddWindow("Miyavi-AK Popular Hop", {
     main_color = Color3.fromRGB(255, 0, 0),
-    min_size = Vector2.new(350, 320),
+    min_size = Vector2.new(350, 350), -- Increased height for kill counter
     can_resize = false
 })
 
 local MainTab = Window:AddTab("Main")
 MainTab:AddLabel("KILL ALL (POPULAR HOP)").TextSize = 24
+
+-- NEW: Kill Counter Label (Visible by default)
+local killCountLabel = MainTab:AddLabel("💀 Total Kills: 0")
+killCountLabel.TextSize = 22
+killCountLabel.TextColor3 = Color3.fromRGB(255, 50, 50)
 
 local statusLabel = MainTab:AddLabel("Status: Loading...")
 local timerLabel = MainTab:AddLabel(string.format("Hop: %ds", _G.serverHopDelay))
@@ -311,7 +323,7 @@ MainTab:AddButton("Clear Whitelist", function()
     whitelistLabel.Text = "Whitelisted: indieuns_fan"
 end)
 
--- FIXED: Initialize and teleport immediately
+-- Initialize
 task.spawn(function()
     wait(1) -- Wait for UI to load
     getCharacter()
@@ -333,7 +345,7 @@ _G.killConnection = RunService.Heartbeat:Connect(function()
     end
 end)
 
--- FIXED: Handle character respawn with proper teleport
+-- Handle character respawn
 LocalPlayer.CharacterAdded:Connect(function()
     wait(0.5)
     equipPunch()
@@ -353,10 +365,11 @@ LocalPlayer.Idled:Connect(function()
     VirtualUser:ClickButton2(Vector2.new())
 end)
 
-print("✅ Miyavi-AK Popular Hop + Auto Island Loaded")
+print("✅ Miyavi-AK Popular Hop + Kill Counter Loaded")
 print("🎯 Kill All: ACTIVE (kills everyone except indieuns_fan)")
 print("👊 Auto Punch: ENABLED BY DEFAULT")
 print("⚡ Fast Punch: ENABLED BY DEFAULT")
 print("🏝️ Auto Tiny Island: ENABLED BY DEFAULT")
+print("💀 Kill Counter: VISIBLE ON MAIN MENU")
 print("⏱️ Server Hop: " .. _G.serverHopDelay .. " seconds")
 print("🔥 SERVER RANGE: " .. _G.minPlayers .. "-" .. _G.maxPlayers .. " players")
