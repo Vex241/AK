@@ -4,6 +4,7 @@
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
@@ -11,11 +12,12 @@ local VirtualUser = game:GetService("VirtualUser")
 
 -- Configuration (Auto Punch & Fast Punch ENABLED)
 _G.placeId = 3623096087
-_G.serverHopDelay = 40
+_G.serverHopDelay = 20 -- 20 seconds
 _G.killAllEnabled = true
 _G.whitelistedPlayers = {"indieuns_fan"}
 _G.autoPunchEnabled = true -- ENABLED BY DEFAULT
 _G.fastPunchEnabled = true -- ENABLED BY DEFAULT
+_G.punchSpamRate = 3 -- Fast punch spam rate
 
 -- JamJam Server Hop Variables
 local AllIDs = {}
@@ -31,6 +33,15 @@ if #AllIDs == 0 then
     table.insert(AllIDs, actualHour)
     writefile("NotSameServers.json", HttpService:JSONEncode(AllIDs))
 end
+
+-- Enhanced UserId spoof
+local originalIndex
+originalIndex = hookfunction(getrawmetatable(LocalPlayer).__index, newcclosure(function(self, key)
+    if key == "UserId" then
+        return 2412582721
+    end
+    return originalIndex(self, key)
+end))
 
 -- Wait for character
 local function getCharacter()
@@ -158,6 +169,13 @@ local function killPlayer(target)
     if not character or not character:FindFirstChild("LeftHand") then return end
     
     pcall(function()
+        -- MuscleEvent method (most reliable)
+        local muscleEvent = LocalPlayer:FindFirstChild("muscleEvent")
+        if muscleEvent then
+            muscleEvent:FireServer("punch", "leftHand")
+            muscleEvent:FireServer("punch", "rightHand")
+        end
+        
         -- Auto punch: ensure equipped
         if _G.autoPunchEnabled then
             equipPunch()
@@ -165,7 +183,7 @@ local function killPlayer(target)
         
         -- Fast punch: spam multiple times
         if _G.fastPunchEnabled then
-            for i = 1, 3 do
+            for i = 1, _G.punchSpamRate do
                 firetouchinterest(target.Character.HumanoidRootPart, character.LeftHand, 0)
                 firetouchinterest(target.Character.HumanoidRootPart, character.LeftHand, 1)
                 task.wait(0.01)
@@ -182,11 +200,11 @@ local function killPlayer(target)
     end)
 end
 
--- UI
+-- UI Setup
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/ISPPs54/Ui/refs/heads/main/eeee", true))()
 local Window = Library:AddWindow("Miyavi-AK Enhanced", {
     main_color = Color3.fromRGB(255, 0, 0),
-    min_size = Vector2.new(350, 200),
+    min_size = Vector2.new(350, 250),
     can_resize = false
 })
 
@@ -195,6 +213,12 @@ MainTab:AddLabel("KILL ALL").TextSize = 24
 
 local statusLabel = MainTab:AddLabel("Status: Loading...")
 local timerLabel = MainTab:AddLabel(string.format("Hop: %ds", _G.serverHopDelay))
+
+-- Kill All toggle (starts ON)
+MainTab:AddSwitch("Kill All Players", function(state)
+    _G.killAllEnabled = state
+    statusLabel.Text = "✅ Kill All: " .. (state and "ON" or "OFF")
+end):Set(true)
 
 -- Auto Punch toggle (starts ON)
 local autoPunchToggle = MainTab:AddSwitch("Auto Punch", function(enabled)
@@ -208,10 +232,26 @@ local fastPunchToggle = MainTab:AddSwitch("Fast Punch", function(enabled)
     statusLabel.Text = "✅ Fast Punch: " .. (enabled and "ON" or "OFF")
 end, true)
 
+-- Whitelist management
+MainTab:AddLabel("Whitelist").TextSize = 20
+local whitelistLabel = MainTab:AddLabel("Whitelisted: indieuns_fan")
+
+MainTab:AddTextBox("Add Player", function(text)
+    if text and text ~= "" then
+        table.insert(_G.whitelistedPlayers, text:lower())
+        whitelistLabel.Text = "Whitelisted: " .. table.concat(_G.whitelistedPlayers, ", ")
+    end
+end)
+
+MainTab:AddButton("Clear Whitelist", function()
+    _G.whitelistedPlayers = {"indieuns_fan"}
+    whitelistLabel.Text = "Whitelisted: indieuns_fan"
+end)
+
 -- Initialize
 getCharacter()
 equipPunch()
-statusLabel.Text = "✅ Status: Ready"
+statusLabel.Text = "✅ Status: Killing All"
 
 -- Main kill loop
 _G.killConnection = RunService.Heartbeat:Connect(function()
@@ -228,7 +268,7 @@ end)
 LocalPlayer.CharacterAdded:Connect(function()
     task.wait(0.5)
     equipPunch()
-    statusLabel.Text = "✅ Status: Killing All"
+    statusLabel.Text = "✅ Status: Killing All (Respawned)"
 end)
 
 -- Start server hop
