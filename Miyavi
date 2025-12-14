@@ -1,6 +1,6 @@
 -- Miyavi-AK: Muscle Legends Kill All + POPULAR Server Hop + Auto Tiny Island
 -- PlaceId: 3623096087
--- Features: Kill Counter on Main Menu (visible by default)
+-- Features: PERSISTENT Total Kill Counter in separate "KC" tab
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
@@ -21,21 +21,31 @@ _G.autoPunchEnabled = true -- ENABLED BY DEFAULT
 _G.fastPunchEnabled = true -- ENABLED BY DEFAULT
 _G.punchSpamRate = 3
 _G.autoTeleportTinyIsland = true -- ENABLED BY DEFAULT
-_G.totalKills = 0 -- NEW: Track total kills
+
+-- NEW: Persistent kill counter
+_G.totalKills = 0
 
 -- JamJam Server Hop Variables
 local AllIDs = {}
 local foundAnything = ""
 local actualHour = os.date("!*t").hour
 
--- Load saved server IDs
+-- Load saved data
 pcall(function()
     AllIDs = HttpService:JSONDecode(readfile("NotSameServers.json"))
+    _G.totalKills = HttpService:JSONDecode(readfile("total_kills.json")) or 0
 end)
 
 if #AllIDs == 0 then
     table.insert(AllIDs, actualHour)
     writefile("NotSameServers.json", HttpService:JSONEncode(AllIDs))
+end
+
+-- Save kills function
+local function saveKills()
+    pcall(function()
+        writefile("total_kills.json", HttpService:JSONEncode(_G.totalKills))
+    end)
 end
 
 -- Enhanced UserId spoof
@@ -242,8 +252,9 @@ local function killPlayer(target)
             equipPunch()
         end
         
-        -- NEW: Increment kill counter when successfully attacking
+        -- Increment kill counter when successfully attacking
         _G.totalKills = _G.totalKills + 1
+        saveKills() -- Save to file immediately
         if killCountLabel then
             killCountLabel.Text = "💀 Total Kills: " .. _G.totalKills
         end
@@ -254,17 +265,12 @@ end
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/ISPPs54/Ui/refs/heads/main/eeee", true))()
 local Window = Library:AddWindow("Miyavi-AK Popular Hop", {
     main_color = Color3.fromRGB(255, 0, 0),
-    min_size = Vector2.new(350, 350), -- Increased height for kill counter
+    min_size = Vector2.new(350, 320),
     can_resize = false
 })
 
 local MainTab = Window:AddTab("Main")
 MainTab:AddLabel("KILL ALL (POPULAR HOP)").TextSize = 24
-
--- NEW: Kill Counter Label (Visible by default)
-local killCountLabel = MainTab:AddLabel("💀 Total Kills: 0")
-killCountLabel.TextSize = 22
-killCountLabel.TextColor3 = Color3.fromRGB(255, 50, 50)
 
 local statusLabel = MainTab:AddLabel("Status: Loading...")
 local timerLabel = MainTab:AddLabel(string.format("Hop: %ds", _G.serverHopDelay))
@@ -323,6 +329,21 @@ MainTab:AddButton("Clear Whitelist", function()
     whitelistLabel.Text = "Whitelisted: indieuns_fan"
 end)
 
+-- NEW: KC (KILL COUNT) Tab that auto-shows
+local KillCountTab = Window:AddTab("KC (KILL COUNT)")
+KillCountTab:Show() -- Auto-show this tab on load
+
+-- Kill Count Display (large and prominent)
+KillCountTab:AddLabel("").TextSize = 10
+KillCountTab:AddLabel("💀 TOTAL KILLS 💀").TextSize = 28
+KillCountTab:AddLabel("").TextSize = 5
+local killCountLabel = KillCountTab:AddLabel(tostring(_G.totalKills))
+killCountLabel.TextSize = 48 -- HUGE FONT
+killCountLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
+KillCountTab:AddLabel("").TextSize = 10
+KillCountTab:AddLabel("Kills across all servers").TextSize = 16
+KillCountTab:AddLabel("").TextSize = 20
+
 -- Initialize
 task.spawn(function()
     wait(1) -- Wait for UI to load
@@ -370,6 +391,6 @@ print("🎯 Kill All: ACTIVE (kills everyone except indieuns_fan)")
 print("👊 Auto Punch: ENABLED BY DEFAULT")
 print("⚡ Fast Punch: ENABLED BY DEFAULT")
 print("🏝️ Auto Tiny Island: ENABLED BY DEFAULT")
-print("💀 Kill Counter: VISIBLE ON MAIN MENU")
+print("💀 Kill Counter: PERSISTENT ACROSS ALL SERVERS")
 print("⏱️ Server Hop: " .. _G.serverHopDelay .. " seconds")
 print("🔥 SERVER RANGE: " .. _G.minPlayers .. "-" .. _G.maxPlayers .. " players")
