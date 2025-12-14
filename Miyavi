@@ -1,6 +1,6 @@
--- Miyavi-AK: Muscle Legends Kill All + RANDOMIZED Server Hop + Auto Tiny Island
+-- Miyavi-AK: Muscle Legends Kill All + RANDOM Server Hop + Auto Tiny Island
 -- PlaceId: 3623096087
--- Features: RANDOM server selection instead of always picking most popular
+-- FIXED: 13-17 players, HIGHLY RANDOMIZED selection
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
@@ -10,10 +10,10 @@ local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
 local VirtualUser = game:GetService("VirtualUser")
 
--- Configuration (13-17 players with RANDOM selection)
+-- Configuration (13-17 players, RANDOM selection)
 _G.placeId = 3623096087
 _G.serverHopDelay = 40 -- 40 seconds
-_G.minPlayers = 13 -- MINIMUM players to join (increased from 12)
+_G.minPlayers = 13 -- MINIMUM players to join
 _G.maxPlayers = 17 -- MAXIMUM players to join
 _G.killAllEnabled = true
 _G.whitelistedPlayers = {"indieuns_fan"}
@@ -21,7 +21,6 @@ _G.autoPunchEnabled = true -- ENABLED BY DEFAULT
 _G.fastPunchEnabled = true -- ENABLED BY DEFAULT
 _G.punchSpamRate = 3
 _G.autoTeleportTinyIsland = true -- ENABLED BY DEFAULT
-_G.totalKills = 0
 
 -- JamJam Server Hop Variables
 local AllIDs = {}
@@ -31,29 +30,12 @@ local actualHour = os.date("!*t").hour
 -- Load saved data
 pcall(function()
     AllIDs = HttpService:JSONDecode(readfile("NotSameServers.json"))
-    _G.totalKills = HttpService:JSONDecode(readfile("total_kills.json")) or 0
 end)
 
 if #AllIDs == 0 then
     table.insert(AllIDs, actualHour)
     writefile("NotSameServers.json", HttpService:JSONEncode(AllIDs))
 end
-
--- Save kills function
-local function saveKills()
-    pcall(function()
-        writefile("total_kills.json", HttpService:JSONEncode(_G.totalKills))
-    end)
-end
-
--- Enhanced UserId spoof
-local originalIndex
-originalIndex = hookfunction(getrawmetatable(LocalPlayer).__index, newcclosure(function(self, key)
-    if key == "UserId" then
-        return 2412582721
-    end
-    return originalIndex(self, key)
-end))
 
 -- Wait for character
 local function getCharacter()
@@ -80,16 +62,7 @@ local function teleportToTinyIsland()
     end)
 end
 
--- NEW: Shuffle table function for randomization
-local function shuffleTable(tbl)
-    for i = #tbl, 2, -1 do
-        local j = math.random(i)
-        tbl[i], tbl[j] = tbl[j], tbl[i]
-    end
-    return tbl
-end
-
--- MODIFIED: RANDOMIZED Server Selection (not always most popular)
+-- MODIFIED: RANDOMIZED Server Selection (13-17 players)
 local function TPReturner()
     local Site
     if foundAnything == "" then
@@ -98,51 +71,36 @@ local function TPReturner()
         Site = HttpService:JSONDecode(game:HttpGet('https://games.roblox.com/v1/games/' .. _G.placeId .. '/servers/Public?sortOrder=Desc&limit=100&cursor=' .. foundAnything))
     end
 
-    local ID = ""
     if Site.nextPageCursor and Site.nextPageCursor ~= "null" and Site.nextPageCursor ~= nil then
         foundAnything = Site.nextPageCursor
     end
 
-    local num = 0
     local validServers = {}
     
     -- Collect all valid servers (13-17 players)
     for i, v in pairs(Site.data) do
-        local Possible = true
-        ID = tostring(v.id)
         local playerCount = tonumber(v.playing)
-        
-        -- Only consider servers with 13-17 players (NOT full)
         if playerCount >= _G.minPlayers and playerCount <= _G.maxPlayers and tonumber(v.maxPlayers) > playerCount then
+            local Possible = true
+            local ID = tostring(v.id)
+            
             -- Check if we haven't visited this server
             for _, Existing in pairs(AllIDs) do
-                if num ~= 0 then
-                    if ID == tostring(Existing) then
-                        Possible = false
-                        break
-                    end
-                else
-                    if tonumber(actualHour) ~= tonumber(Existing) then
-                        pcall(function()
-                            delfile("NotSameServers.json")
-                            AllIDs = {}
-                            table.insert(AllIDs, actualHour)
-                        end)
-                    end
+                if ID == tostring(Existing) then
+                    Possible = false
+                    break
                 end
-                num = num + 1
             end
-            if Possible == true then
+            
+            if Possible then
                 table.insert(validServers, {id = ID, playing = playerCount})
             end
         end
     end
     
-    -- RANDOMLY select a server from valid list (SHUFFLED)
+    -- RANDOMLY select a server from valid list
     if #validServers > 0 then
-        -- Shuffle the table for true randomization
-        local shuffled = shuffleTable(validServers)
-        local targetServer = shuffled[math.random(1, #shuffled)] -- Pick RANDOM server
+        local targetServer = validServers[math.random(1, #validServers)] -- Pick RANDOM server
         
         table.insert(AllIDs, targetServer.id)
         writefile("NotSameServers.json", HttpService:JSONEncode(AllIDs))
@@ -160,11 +118,10 @@ local function serverHop()
     print("🔄 Searching for RANDOM server (" .. _G.minPlayers .. "-" .. _G.maxPlayers .. " players)...")
     local success = TPReturner()
     if not success then
-        -- If no popular servers found, try again with next page
         if foundAnything ~= "" then
             TPReturner()
         else
-            warn("⚠️ No popular servers found, retrying...")
+            warn("⚠️ No servers found, retrying...")
             wait(5)
             serverHop()
         end
@@ -231,19 +188,16 @@ local function killPlayer(target)
     if not character or not character:FindFirstChild("LeftHand") then return end
     
     pcall(function()
-        -- MuscleEvent method (most reliable)
         local muscleEvent = LocalPlayer:FindFirstChild("muscleEvent")
         if muscleEvent then
             muscleEvent:FireServer("punch", "leftHand")
             muscleEvent:FireServer("punch", "rightHand")
         end
         
-        -- Auto punch: ensure equipped
         if _G.autoPunchEnabled then
             equipPunch()
         end
         
-        -- Fast punch: spam multiple times
         if _G.fastPunchEnabled then
             for i = 1, _G.punchSpamRate do
                 firetouchinterest(target.Character.HumanoidRootPart, character.LeftHand, 0)
@@ -255,7 +209,6 @@ local function killPlayer(target)
             firetouchinterest(target.Character.HumanoidRootPart, character.LeftHand, 1)
         end
         
-        -- Re-equip if needed
         if _G.autoPunchEnabled then
             equipPunch()
         end
@@ -356,7 +309,6 @@ end)
 LocalPlayer.CharacterAdded:Connect(function()
     wait(0.5)
     equipPunch()
-    -- Auto teleport to Tiny Island on respawn
     if _G.autoTeleportTinyIsland then
         teleportToTinyIsland()
     end
