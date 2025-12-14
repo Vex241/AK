@@ -1,6 +1,6 @@
 -- Miyavi-AK: Muscle Legends Kill All + POPULAR Server Hop + Auto Tiny Island
 -- PlaceId: 3623096087
--- Auto Punch, Fast Punch & Auto Tiny Island ENABLED BY DEFAULT
+-- Server Range: 12-17 players (avoids full servers)
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
@@ -10,11 +10,11 @@ local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
 local VirtualUser = game:GetService("VirtualUser")
 
--- Configuration
+-- Configuration (12-17 players to avoid full servers)
 _G.placeId = 3623096087
 _G.serverHopDelay = 40 -- 40 seconds
-_G.minPlayers = 12 -- MINIMUM players to join (12-19 range)
-_G.maxPlayers = 19 -- MAXIMUM players to join (avoid full 20/20)
+_G.minPlayers = 12 -- MINIMUM players to join
+_G.maxPlayers = 17 -- MAXIMUM players to join (reduced from 19 to avoid full)
 _G.killAllEnabled = true
 _G.whitelistedPlayers = {"indieuns_fan"}
 _G.autoPunchEnabled = true -- ENABLED BY DEFAULT
@@ -56,7 +56,7 @@ local function getCharacter()
     return char
 end
 
--- FIXED: Teleport to Tiny Island - simpler and more reliable
+-- Teleport to Tiny Island
 local function teleportToTinyIsland()
     task.spawn(function()
         wait(0.5) -- Wait for character to fully load
@@ -71,7 +71,7 @@ local function teleportToTinyIsland()
     end)
 end
 
--- MODIFIED: Joins POPULAR servers only (12-19 players)
+-- MODIFIED: Joins POPULAR servers only (12-17 players)
 local function TPReturner()
     local Site
     if foundAnything == "" then
@@ -88,13 +88,13 @@ local function TPReturner()
     local num = 0
     local validServers = {}
     
-    -- PRIORITIZE popular servers in 12-19 range
+    -- PRIORITIZE popular servers in 12-17 range (AVOIDS FULL SERVERS)
     for i, v in pairs(Site.data) do
         local Possible = true
         ID = tostring(v.id)
         local playerCount = tonumber(v.playing)
         
-        -- Only consider servers with 12-19 players (not full)
+        -- Only consider servers with 12-17 players (NOT full)
         if playerCount >= _G.minPlayers and playerCount <= _G.maxPlayers and tonumber(v.maxPlayers) > playerCount then
             -- Check if we haven't visited this server
             for _, Existing in pairs(AllIDs) do
@@ -284,14 +284,14 @@ end, true)
 -- Server settings
 MainTab:AddLabel("Server Settings").TextSize = 20
 
--- Min Players setting (1-19)
-MainTab:AddTextBox("Min Players (1-19)", function(text)
+-- Min Players setting (1-17)
+MainTab:AddTextBox("Min Players (1-17)", function(text)
     local num = tonumber(text)
-    if num and num >= 1 and num <= 19 then
+    if num and num >= 1 and num <= 17 then
         _G.minPlayers = math.floor(num)
         statusLabel.Text = "✅ Min Players: " .. _G.minPlayers
     else
-        statusLabel.Text = "⚠️ Enter number between 1-19"
+        statusLabel.Text = "⚠️ Enter number between 1-17"
     end
 end, {placeholder = "12"})
 
