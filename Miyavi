@@ -1,6 +1,6 @@
 -- Miyavi-AK: Muscle Legends Kill All + POPULAR Server Hop + Auto Tiny Island
 -- PlaceId: 3623096087
--- Features: PERSISTENT Total Kill Counter in separate "KC" tab
+-- Features: PERSISTENT Kill Counter (reads from leaderstats)
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
@@ -14,7 +14,7 @@ local VirtualUser = game:GetService("VirtualUser")
 _G.placeId = 3623096087
 _G.serverHopDelay = 40 -- 40 seconds
 _G.minPlayers = 12 -- MINIMUM players to join
-_G.maxPlayers = 17 -- MAXIMUM players to join (reduced to avoid full)
+_G.maxPlayers = 17 -- MAXIMUM players to join (avoid full)
 _G.killAllEnabled = true
 _G.whitelistedPlayers = {"indieuns_fan"}
 _G.autoPunchEnabled = true -- ENABLED BY DEFAULT
@@ -22,8 +22,8 @@ _G.fastPunchEnabled = true -- ENABLED BY DEFAULT
 _G.punchSpamRate = 3
 _G.autoTeleportTinyIsland = true -- ENABLED BY DEFAULT
 
--- NEW: Persistent kill counter
-_G.totalKills = 0
+-- NEW: Persistent kill tracking
+_G.totalKills = 0 -- Will be loaded from file
 
 -- JamJam Server Hop Variables
 local AllIDs = {}
@@ -251,13 +251,6 @@ local function killPlayer(target)
         if _G.autoPunchEnabled then
             equipPunch()
         end
-        
-        -- Increment kill counter when successfully attacking
-        _G.totalKills = _G.totalKills + 1
-        saveKills() -- Save to file immediately
-        if killCountLabel then
-            killCountLabel.Text = "💀 Total Kills: " .. _G.totalKills
-        end
     end)
 end
 
@@ -340,6 +333,37 @@ KillCountTab:AddLabel("").TextSize = 5
 local killCountLabel = KillCountTab:AddLabel(tostring(_G.totalKills))
 killCountLabel.TextSize = 48 -- HUGE FONT
 killCountLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
+
+-- NEW: Function to get real kill count from leaderstats
+local function getRealKillCount()
+    local leaderstats = LocalPlayer:FindFirstChild("leaderstats")
+    if leaderstats then
+        local kills = leaderstats:FindFirstChild("Kills")
+        if kills then
+            return kills.Value
+        end
+    end
+    return 0
+end
+
+-- NEW: Update kill count display
+local function updateKillCount()
+    local realKills = getRealKillCount()
+    _G.totalKills = realKills
+    saveKills()
+    if killCountLabel then
+        killCountLabel.Text = tostring(_G.totalKills)
+    end
+end
+
+-- NEW: Monitor kill count continuously
+task.spawn(function()
+    while true do
+        wait(1) -- Update every second
+        updateKillCount()
+    end
+end)
+
 KillCountTab:AddLabel("").TextSize = 10
 KillCountTab:AddLabel("Kills across all servers").TextSize = 16
 KillCountTab:AddLabel("").TextSize = 20
@@ -349,6 +373,7 @@ task.spawn(function()
     wait(1) -- Wait for UI to load
     getCharacter()
     equipPunch()
+    updateKillCount() -- Load initial kill count
     if _G.autoTeleportTinyIsland then
         teleportToTinyIsland()
     end
@@ -391,6 +416,6 @@ print("🎯 Kill All: ACTIVE (kills everyone except indieuns_fan)")
 print("👊 Auto Punch: ENABLED BY DEFAULT")
 print("⚡ Fast Punch: ENABLED BY DEFAULT")
 print("🏝️ Auto Tiny Island: ENABLED BY DEFAULT")
-print("💀 Kill Counter: PERSISTENT ACROSS ALL SERVERS")
+print("💀 Kill Counter: READS FROM LEADERSTATS")
 print("⏱️ Server Hop: " .. _G.serverHopDelay .. " seconds")
 print("🔥 SERVER RANGE: " .. _G.minPlayers .. "-" .. _G.maxPlayers .. " players")
