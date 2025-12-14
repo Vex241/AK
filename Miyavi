@@ -1,6 +1,6 @@
--- Miyavi-AK: Muscle Legends Kill All + POPULAR Server Hop + Auto Tiny Island
+-- Miyavi-AK: Muscle Legends Kill All + RANDOMIZED Server Hop + Auto Tiny Island
 -- PlaceId: 3623096087
--- Features: PERSISTENT Kill Counter (reads from leaderstats)
+-- Features: RANDOM server selection instead of always picking most popular
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
@@ -10,20 +10,18 @@ local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
 local VirtualUser = game:GetService("VirtualUser")
 
--- Configuration (12-17 players to avoid full servers)
+-- Configuration (13-17 players with RANDOM selection)
 _G.placeId = 3623096087
 _G.serverHopDelay = 40 -- 40 seconds
-_G.minPlayers = 12 -- MINIMUM players to join
-_G.maxPlayers = 17 -- MAXIMUM players to join (avoid full)
+_G.minPlayers = 13 -- MINIMUM players to join (increased from 12)
+_G.maxPlayers = 17 -- MAXIMUM players to join
 _G.killAllEnabled = true
 _G.whitelistedPlayers = {"indieuns_fan"}
 _G.autoPunchEnabled = true -- ENABLED BY DEFAULT
 _G.fastPunchEnabled = true -- ENABLED BY DEFAULT
 _G.punchSpamRate = 3
 _G.autoTeleportTinyIsland = true -- ENABLED BY DEFAULT
-
--- NEW: Persistent kill tracking
-_G.totalKills = 0 -- Will be loaded from file
+_G.totalKills = 0
 
 -- JamJam Server Hop Variables
 local AllIDs = {}
@@ -82,7 +80,16 @@ local function teleportToTinyIsland()
     end)
 end
 
--- MODIFIED: Joins POPULAR servers only (12-17 players)
+-- NEW: Shuffle table function for randomization
+local function shuffleTable(tbl)
+    for i = #tbl, 2, -1 do
+        local j = math.random(i)
+        tbl[i], tbl[j] = tbl[j], tbl[i]
+    end
+    return tbl
+end
+
+-- MODIFIED: RANDOMIZED Server Selection (not always most popular)
 local function TPReturner()
     local Site
     if foundAnything == "" then
@@ -99,13 +106,13 @@ local function TPReturner()
     local num = 0
     local validServers = {}
     
-    -- PRIORITIZE popular servers in 12-17 range (AVOIDS FULL SERVERS)
+    -- Collect all valid servers (13-17 players)
     for i, v in pairs(Site.data) do
         local Possible = true
         ID = tostring(v.id)
         local playerCount = tonumber(v.playing)
         
-        -- Only consider servers with 12-17 players (NOT full)
+        -- Only consider servers with 13-17 players (NOT full)
         if playerCount >= _G.minPlayers and playerCount <= _G.maxPlayers and tonumber(v.maxPlayers) > playerCount then
             -- Check if we haven't visited this server
             for _, Existing in pairs(AllIDs) do
@@ -131,15 +138,16 @@ local function TPReturner()
         end
     end
     
-    -- Join the MOST POPULAR server from valid list
+    -- RANDOMLY select a server from valid list (SHUFFLED)
     if #validServers > 0 then
-        table.sort(validServers, function(a, b) return a.playing > b.playing end)
-        local targetServer = validServers[1] -- Server with MOST players
+        -- Shuffle the table for true randomization
+        local shuffled = shuffleTable(validServers)
+        local targetServer = shuffled[math.random(1, #shuffled)] -- Pick RANDOM server
         
         table.insert(AllIDs, targetServer.id)
         writefile("NotSameServers.json", HttpService:JSONEncode(AllIDs))
         
-        print("✅ Joining POPULAR server with " .. targetServer.playing .. " players!")
+        print("✅ Joining RANDOM server with " .. targetServer.playing .. " players!")
         TeleportService:TeleportToPlaceInstance(_G.placeId, targetServer.id, LocalPlayer)
         wait(4)
         return true
@@ -149,7 +157,7 @@ local function TPReturner()
 end
 
 local function serverHop()
-    print("🔄 Searching for POPULAR server (" .. _G.minPlayers .. "-" .. _G.maxPlayers .. " players)...")
+    print("🔄 Searching for RANDOM server (" .. _G.minPlayers .. "-" .. _G.maxPlayers .. " players)...")
     local success = TPReturner()
     if not success then
         -- If no popular servers found, try again with next page
@@ -174,7 +182,7 @@ local function startServerHop()
                 task.wait(1)
             end
             if statusLabel then
-                statusLabel.Text = "🚀 SERVER HOPPING TO POPULAR SERVER!"
+                statusLabel.Text = "🚀 SERVER HOPPING TO RANDOM SERVER!"
             end
             serverHop()
             task.wait(5)
@@ -256,14 +264,14 @@ end
 
 -- UI Setup
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/ISPPs54/Ui/refs/heads/main/eeee", true))()
-local Window = Library:AddWindow("Miyavi-AK Popular Hop", {
+local Window = Library:AddWindow("Miyavi-AK Random Hop", {
     main_color = Color3.fromRGB(255, 0, 0),
     min_size = Vector2.new(350, 320),
     can_resize = false
 })
 
 local MainTab = Window:AddTab("Main")
-MainTab:AddLabel("KILL ALL (POPULAR HOP)").TextSize = 24
+MainTab:AddLabel("KILL ALL (RANDOM HOP)").TextSize = 24
 
 local statusLabel = MainTab:AddLabel("Status: Loading...")
 local timerLabel = MainTab:AddLabel(string.format("Hop: %ds", _G.serverHopDelay))
@@ -304,7 +312,7 @@ MainTab:AddTextBox("Min Players (1-17)", function(text)
     else
         statusLabel.Text = "⚠️ Enter number between 1-17"
     end
-end, {placeholder = "12"})
+end, {placeholder = "13"})
 
 -- Whitelist management
 MainTab:AddLabel("Whitelist").TextSize = 20
@@ -322,58 +330,11 @@ MainTab:AddButton("Clear Whitelist", function()
     whitelistLabel.Text = "Whitelisted: indieuns_fan"
 end)
 
--- NEW: KC (KILL COUNT) Tab that auto-shows
-local KillCountTab = Window:AddTab("KC (KILL COUNT)")
-KillCountTab:Show() -- Auto-show this tab on load
-
--- Kill Count Display (large and prominent)
-KillCountTab:AddLabel("").TextSize = 10
-KillCountTab:AddLabel("💀 TOTAL KILLS 💀").TextSize = 28
-KillCountTab:AddLabel("").TextSize = 5
-local killCountLabel = KillCountTab:AddLabel(tostring(_G.totalKills))
-killCountLabel.TextSize = 48 -- HUGE FONT
-killCountLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
-
--- NEW: Function to get real kill count from leaderstats
-local function getRealKillCount()
-    local leaderstats = LocalPlayer:FindFirstChild("leaderstats")
-    if leaderstats then
-        local kills = leaderstats:FindFirstChild("Kills")
-        if kills then
-            return kills.Value
-        end
-    end
-    return 0
-end
-
--- NEW: Update kill count display
-local function updateKillCount()
-    local realKills = getRealKillCount()
-    _G.totalKills = realKills
-    saveKills()
-    if killCountLabel then
-        killCountLabel.Text = tostring(_G.totalKills)
-    end
-end
-
--- NEW: Monitor kill count continuously
-task.spawn(function()
-    while true do
-        wait(1) -- Update every second
-        updateKillCount()
-    end
-end)
-
-KillCountTab:AddLabel("").TextSize = 10
-KillCountTab:AddLabel("Kills across all servers").TextSize = 16
-KillCountTab:AddLabel("").TextSize = 20
-
 -- Initialize
 task.spawn(function()
     wait(1) -- Wait for UI to load
     getCharacter()
     equipPunch()
-    updateKillCount() -- Load initial kill count
     if _G.autoTeleportTinyIsland then
         teleportToTinyIsland()
     end
@@ -411,11 +372,11 @@ LocalPlayer.Idled:Connect(function()
     VirtualUser:ClickButton2(Vector2.new())
 end)
 
-print("✅ Miyavi-AK Popular Hop + Kill Counter Loaded")
+print("✅ Miyavi-AK Random Hop Loaded")
 print("🎯 Kill All: ACTIVE (kills everyone except indieuns_fan)")
 print("👊 Auto Punch: ENABLED BY DEFAULT")
 print("⚡ Fast Punch: ENABLED BY DEFAULT")
 print("🏝️ Auto Tiny Island: ENABLED BY DEFAULT")
-print("💀 Kill Counter: READS FROM LEADERSTATS")
+print("🎲 RANDOM HOP: ENABLED (13-17 player range)")
 print("⏱️ Server Hop: " .. _G.serverHopDelay .. " seconds")
 print("🔥 SERVER RANGE: " .. _G.minPlayers .. "-" .. _G.maxPlayers .. " players")
