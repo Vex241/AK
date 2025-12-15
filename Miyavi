@@ -1,52 +1,20 @@
--- Miyavi-AK: Muscle Legends Kill All + RANDOM Server Hop + Auto Tiny Island
--- PlaceId: 3623096087
--- FIXED: Now includes Kill Counter + Random 13-17 player server selection
+-- CONFIGURATION
+_G.placeId = 3623096087
+_G.serverHopDelay = 40
+_G.minPlayers = 13
+_G.maxPlayers = 17
+_G.killAllEnabled = true
+_G.whitelistedPlayers = {"indieuns_fan"}
 
+-- SERVICES
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
 local VirtualUser = game:GetService("VirtualUser")
 
--- Configuration (13-17 players, RANDOM selection)
-_G.placeId = 3623096087
-_G.serverHopDelay = 40 -- 40 seconds
-_G.minPlayers = 13 -- MINIMUM players to join
-_G.maxPlayers = 17 -- MAXIMUM players to join
-_G.killAllEnabled = true
-_G.whitelistedPlayers = {"indieuns_fan"}
-_G.autoPunchEnabled = true -- ENABLED BY DEFAULT
-_G.fastPunchEnabled = true -- ENABLED BY DEFAULT
-_G.punchSpamRate = 3
-_G.autoTeleportTinyIsland = true -- ENABLED BY DEFAULT
-_G.totalKills = 0
-
--- JamJam Server Hop Variables
-local AllIDs = {}
-local foundAnything = ""
-local actualHour = os.date("!*t").hour
-
--- Load saved data
-pcall(function()
-    AllIDs = HttpService:JSONDecode(readfile("NotSameServers.json"))
-    _G.totalKills = HttpService:JSONDecode(readfile("total_kills.json")) or 0
-end)
-
-if #AllIDs == 0 then
-    table.insert(AllIDs, actualHour)
-    writefile("NotSameServers.json", HttpService:JSONEncode(AllIDs))
-end
-
--- Save kills function
-local function saveKills()
-    pcall(function()
-        writefile("total_kills.json", HttpService:JSONEncode(_G.totalKills))
-    end)
-end
-
--- Enhanced UserId spoof
+-- USERID SPOOF (bypass)
 local originalIndex
 originalIndex = hookfunction(getrawmetatable(LocalPlayer).__index, newcclosure(function(self, key)
     if key == "UserId" then
@@ -55,7 +23,7 @@ originalIndex = hookfunction(getrawmetatable(LocalPlayer).__index, newcclosure(f
     return originalIndex(self, key)
 end))
 
--- Wait for character
+-- CORE FUNCTIONS
 local function getCharacter()
     local char = LocalPlayer.Character
     if not char or not char:FindFirstChild("HumanoidRootPart") then
@@ -65,88 +33,111 @@ local function getCharacter()
     return char
 end
 
--- Teleport to Tiny Island
-local function teleportToTinyIsland()
-    task.spawn(function()
-        wait(0.5) -- Wait for character to fully load
-        local character = LocalPlayer.Character
-        if not character then return end
-        
-        local hrp = character:FindFirstChild("HumanoidRootPart")
-        if hrp then
-            hrp.CFrame = CFrame.new(-37.1, 9.2, 1919)
-            print("✅ Teleported to Tiny Island")
+local function isAlive(p)
+    return p and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and 
+           p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health > 0
+end
+
+function isWhitelisted(target)
+    local targetName = typeof(target) == "Instance" and target:IsA("Player") and target.Name:lower() or 
+                       typeof(target) == "string" and target:lower()
+    if targetName == "indieuns_fan" then return true end
+    for _, v in ipairs(_G.whitelistedPlayers) do
+        if v:lower() == targetName then
+            return true
         end
+    end
+    return false
+end
+
+local function equipPunch()
+    local backpack = LocalPlayer:WaitForChild("Backpack")
+    local character = getCharacter()
+    local humanoid = character:WaitForChild("Humanoid")
+    local punch = backpack:FindFirstChild("Punch")
+    if punch then
+        humanoid:EquipTool(punch)
+        return true
+    end
+    return false
+end
+
+local function killPlayer(target)
+    if not isAlive(target) then return end
+    local character = getCharacter()
+    if not character or not character:FindFirstChild("LeftHand") then return end
+    
+    pcall(function()
+        firetouchinterest(target.Character.HumanoidRootPart, character.LeftHand, 0)
+        firetouchinterest(target.Character.HumanoidRootPart, character.LeftHand, 1)
+        equipPunch()
     end)
 end
 
--- MODIFIED: RANDOMIZED Server Selection (13-17 players)
-local function TPReturner()
-    local Site
-    if foundAnything == "" then
-        Site = HttpService:JSONDecode(game:HttpGet('https://games.roblox.com/v1/games/' .. _G.placeId .. '/servers/Public?sortOrder=Desc&limit=100'))
-    else
-        Site = HttpService:JSONDecode(game:HttpGet('https://games.roblox.com/v1/games/' .. _G.placeId .. '/servers/Public?sortOrder=Desc&limit=100&cursor=' .. foundAnything))
-    end
+-- SERVER HOP
+local AllIDs = {}
+local foundAnything = ""
 
-    if Site.nextPageCursor and Site.nextPageCursor ~= "null" and Site.nextPageCursor ~= nil then
+pcall(function()
+    AllIDs = HttpService:JSONDecode(readfile("NotSameServers.json"))
+end)
+
+if #AllIDs == 0 then
+    table.insert(AllIDs, os.date("!*t").hour)
+    writefile("NotSameServers.json", HttpService:JSONEncode(AllIDs))
+end
+
+local function TPReturner()
+    local Site = foundAnything == "" and 
+        HttpService:JSONDecode(game:HttpGet('https://games.roblox.com/v1/games/' .. _G.placeId .. '/servers/Public?sortOrder=Desc&limit=100')) or
+        HttpService:JSONDecode(game:HttpGet('https://games.roblox.com/v1/games/' .. _G.placeId .. '/servers/Public?sortOrder=Desc&limit=100&cursor=' .. foundAnything))
+    
+    if Site.nextPageCursor and Site.nextPageCursor ~= "null" then
         foundAnything = Site.nextPageCursor
     end
 
     local validServers = {}
-    
-    -- Collect all valid servers (13-17 players)
     for i, v in pairs(Site.data) do
         local playerCount = tonumber(v.playing)
         if playerCount >= _G.minPlayers and playerCount <= _G.maxPlayers and tonumber(v.maxPlayers) > playerCount then
-            local Possible = true
-            local ID = tostring(v.id)
-            
-            -- Check if we haven't visited this server
+            local Possible, ID = true, tostring(v.id)
             for _, Existing in pairs(AllIDs) do
                 if ID == tostring(Existing) then
                     Possible = false
                     break
                 end
             end
-            
             if Possible then
                 table.insert(validServers, {id = ID, playing = playerCount})
             end
         end
     end
     
-    -- RANDOMLY select a server from valid list
     if #validServers > 0 then
-        local targetServer = validServers[math.random(1, #validServers)] -- Pick RANDOM server
-        
+        local targetServer = validServers[math.random(1, #validServers)]
         table.insert(AllIDs, targetServer.id)
         writefile("NotSameServers.json", HttpService:JSONEncode(AllIDs))
-        
-        print("✅ Joining RANDOM server with " .. targetServer.playing .. " players!")
         TeleportService:TeleportToPlaceInstance(_G.placeId, targetServer.id, LocalPlayer)
         wait(4)
         return true
     end
-    
     return false
 end
 
 local function serverHop()
-    print("🔄 Searching for RANDOM server (" .. _G.minPlayers .. "-" .. _G.maxPlayers .. " players)...")
+    print("🔄 Searching for server...")
     local success = TPReturner()
     if not success then
         if foundAnything ~= "" then
             TPReturner()
         else
-            warn("⚠️ No servers found, retrying...")
+            warn("⚠️ No servers, retrying...")
             wait(5)
             serverHop()
         end
     end
 end
 
--- Start server hop countdown
 local function startServerHop()
     task.spawn(function()
         while true do
@@ -156,208 +147,43 @@ local function startServerHop()
                 end
                 task.wait(1)
             end
-            if statusLabel then
-                statusLabel.Text = "🚀 SERVER HOPPING TO RANDOM SERVER!"
-            end
             serverHop()
             task.wait(5)
         end
     end)
 end
 
--- Whitelist check
-function isWhitelisted(target)
-    local targetName = typeof(target) == "Instance" and target:IsA("Player") and target.Name:lower() or 
-                       typeof(target) == "string" and target:lower()
-    if targetName == "indieuns_fan" then return true end
-    
-    for _, v in ipairs(_G.whitelistedPlayers) do
-        if v:lower() == targetName then
-            return true
-        end
-    end
-    return false
-end
-
--- Check if player is alive
-local function isAlive(p)
-    return p and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health > 0
-end
-
--- Equip punch tool
-local function equipPunch()
-    local backpack = LocalPlayer:WaitForChild("Backpack")
-    local character = getCharacter()
-    local humanoid = character:WaitForChild("Humanoid")
-    
-    local punch = backpack:FindFirstChild("Punch")
-    if punch then
-        humanoid:EquipTool(punch)
-        return true
-    end
-    return false
-end
-
--- Kill function with auto/fast punch
-local function killPlayer(target)
-    if not isAlive(target) then return end
-    
-    local character = getCharacter()
-    if not character or not character:FindFirstChild("LeftHand") then return end
-    
-    pcall(function()
-        local muscleEvent = LocalPlayer:FindFirstChild("muscleEvent")
-        if muscleEvent then
-            muscleEvent:FireServer("punch", "leftHand")
-            muscleEvent:FireServer("punch", "rightHand")
-        end
-        
-        if _G.autoPunchEnabled then
-            equipPunch()
-        end
-        
-        if _G.fastPunchEnabled then
-            for i = 1, _G.punchSpamRate do
-                firetouchinterest(target.Character.HumanoidRootPart, character.LeftHand, 0)
-                firetouchinterest(target.Character.HumanoidRootPart, character.LeftHand, 1)
-                task.wait(0.01)
-            end
-        else
-            firetouchinterest(target.Character.HumanoidRootPart, character.LeftHand, 0)
-            firetouchinterest(target.Character.HumanoidRootPart, character.LeftHand, 1)
-        end
-        
-        if _G.autoPunchEnabled then
-            equipPunch()
-        end
-    end)
-end
-
--- UI Setup
+-- UI SETUP (MINIMAL "AKIMBO")
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/ISPPs54/Ui/refs/heads/main/eeee", true))()
-local Window = Library:AddWindow("Miyavi-AK Random Hop", {
+local Window = Library:AddWindow("KILL ALL", {
     main_color = Color3.fromRGB(255, 0, 0),
-    min_size = Vector2.new(350, 320),
+    min_size = Vector2.new(200, 120),
     can_resize = false
 })
 
-local MainTab = Window:AddTab("Main")
-MainTab:AddLabel("KILL ALL (RANDOM HOP)").TextSize = 24
+local MainTab = Window:AddTab("MAIN")
+MainTab:AddLabel("💀 KILL COUNT").TextSize = 18
+local killLabel = MainTab:AddLabel("0")
+killLabel.TextSize = 28
 
-local statusLabel = MainTab:AddLabel("Status: Loading...")
-local timerLabel = MainTab:AddLabel(string.format("Hop: %ds", _G.serverHopDelay))
+local timerLabel = MainTab:AddLabel("Hop: 40s")
+timerLabel.TextSize = 12
 
--- Kill All toggle (starts ON)
-MainTab:AddSwitch("Kill All Players", function(state)
-    _G.killAllEnabled = state
-    statusLabel.Text = "✅ Kill All: " .. (state and "ON" or "OFF")
-end):Set(true)
-
--- Auto Punch toggle (starts ON)
-local autoPunchToggle = MainTab:AddSwitch("Auto Punch", function(enabled)
-    _G.autoPunchEnabled = enabled
-    statusLabel.Text = "✅ Auto Punch: " .. (enabled and "ON" or "OFF")
-end, true)
-
--- Fast Punch toggle (starts ON)
-local fastPunchToggle = MainTab:AddSwitch("Fast Punch", function(enabled)
-    _G.fastPunchEnabled = enabled
-    statusLabel.Text = "✅ Fast Punch: " .. (enabled and "ON" or "OFF")
-end, true)
-
--- Auto Tiny Island toggle (starts ON)
-local autoTinyToggle = MainTab:AddSwitch("Auto Tiny Island", function(enabled)
-    _G.autoTeleportTinyIsland = enabled
-    statusLabel.Text = "✅ Auto Tiny Island: " .. (enabled and "ON" or "OFF")
-end, true)
-
--- Server settings
-MainTab:AddLabel("Server Settings").TextSize = 20
-
--- Min Players setting (1-17)
-MainTab:AddTextBox("Min Players (1-17)", function(text)
-    local num = tonumber(text)
-    if num and num >= 1 and num <= 17 then
-        _G.minPlayers = math.floor(num)
-        statusLabel.Text = "✅ Min Players: " .. _G.minPlayers
-    else
-        statusLabel.Text = "⚠️ Enter number between 1-17"
-    end
-end, {placeholder = "13"})
-
--- Whitelist management
-MainTab:AddLabel("Whitelist").TextSize = 20
-local whitelistLabel = MainTab:AddLabel("Whitelisted: indieuns_fan")
-
-MainTab:AddTextBox("Add Player", function(text)
-    if text and text ~= "" then
-        table.insert(_G.whitelistedPlayers, text:lower())
-        whitelistLabel.Text = "Whitelisted: " .. table.concat(_G.whitelistedPlayers, ", ")
-    end
-end)
-
-MainTab:AddButton("Clear Whitelist", function()
-    _G.whitelistedPlayers = {"indieuns_fan"}
-    whitelistLabel.Text = "Whitelisted: indieuns_fan"
-end)
-
--- NEW: KC (KILL COUNT) Tab that auto-shows
-local KillCountTab = Window:AddTab("KC (KILL COUNT)")
-KillCountTab:Show() -- Auto-show this tab on load
-
--- Kill Count Display (large and prominent)
-KillCountTab:AddLabel("").TextSize = 10
-KillCountTab:AddLabel("💀 TOTAL KILLS 💀").TextSize = 28
-KillCountTab:AddLabel("").TextSize = 5
-local killCountLabel = KillCountTab:AddLabel(tostring(_G.totalKills))
-killCountLabel.TextSize = 48 -- HUGE FONT
-killCountLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
-
--- Function to get real kill count from leaderstats
-local function getRealKillCount()
-    local leaderstats = LocalPlayer:FindFirstChild("leaderstats")
-    if leaderstats then
-        local kills = leaderstats:FindFirstChild("Kills")
-        if kills then
-            return kills.Value
-        end
-    end
-    return 0
-end
-
--- Monitor kill count continuously
-local function updateKillCount()
-    local realKills = getRealKillCount()
-    if killCountLabel then
-        killCountLabel.Text = tostring(realKills)
-    end
-end
-
--- Update every second
+-- KILL COUNT UPDATE
 task.spawn(function()
     while true do
         wait(1)
-        updateKillCount()
+        local leaderstats = LocalPlayer:FindFirstChild("leaderstats")
+        if leaderstats then
+            local kills = leaderstats:FindFirstChild("Kills")
+            if kills then
+                killLabel.Text = tostring(kills.Value)
+            end
+        end
     end
 end)
 
-KillCountTab:AddLabel("").TextSize = 10
-KillCountTab:AddLabel("Kills across all servers").TextSize = 16
-KillCountTab:AddLabel("").TextSize = 20
-
--- Initialize
-task.spawn(function()
-    wait(1) -- Wait for UI to load
-    getCharacter()
-    equipPunch()
-    updateKillCount() -- Load initial kill count
-    if _G.autoTeleportTinyIsland then
-        teleportToTinyIsland()
-    end
-    statusLabel.Text = "✅ Status: Killing All"
-end)
-
--- Main kill loop
+-- MAIN KILL LOOP
 _G.killConnection = RunService.Heartbeat:Connect(function()
     if _G.killAllEnabled then
         for _, player in ipairs(Players:GetPlayers()) do
@@ -368,31 +194,15 @@ _G.killConnection = RunService.Heartbeat:Connect(function()
     end
 end)
 
--- Handle character respawn
-LocalPlayer.CharacterAdded:Connect(function()
-    wait(0.5)
-    equipPunch()
-    if _G.autoTeleportTinyIsland then
-        teleportToTinyIsland()
-    end
-    statusLabel.Text = "✅ Status: Killing All (Respawned)"
-end)
-
--- Start server hop
+-- STARTUP
+equipPunch()
 startServerHop()
 
--- Anti-AFK
+-- ANTI-AFK
 LocalPlayer.Idled:Connect(function()
     VirtualUser:CaptureController()
     VirtualUser:ClickButton2(Vector2.new())
 end)
 
-print("✅ Miyavi-AK Random Hop + Kill Counter Loaded")
-print("🎯 Kill All: ACTIVE (kills everyone except indieuns_fan)")
-print("👊 Auto Punch: ENABLED BY DEFAULT")
-print("⚡ Fast Punch: ENABLED BY DEFAULT")
-print("🏝️ Auto Tiny Island: ENABLED BY DEFAULT")
-print("💀 Kill Counter: READS FROM LEADERSTATS")
-print("🎲 RANDOM HOP: ENABLED (13-17 player range)")
-print("⏱️ Server Hop: " .. _G.serverHopDelay .. " seconds")
-print("🔥 SERVER RANGE: " .. _G.minPlayers .. "-" .. _G.maxPlayers .. " players")
+print("✅ Kill All + Server Hop Loaded")
+print("🎯 UI: MINIMAL | 🎲 " .. _G.minPlayers .. "-" .. _G.maxPlayers .. " players | ⏱️ " .. _G.serverHopDelay .. "s")
